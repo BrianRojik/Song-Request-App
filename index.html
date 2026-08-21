@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Request a Song</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body{font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:24px;background:#111;color:#fff}
+    h1{font-size:2rem;margin-bottom:8px} p{color:#bbb}
+    input{width:100%;padding:14px;margin:8px 0 14px;border-radius:10px;border:1px solid #444;background:#1d1d1d;color:#fff;box-sizing:border-box}
+    .song{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #333}
+    button{padding:10px 16px;border:0;border-radius:10px;cursor:pointer;font-weight:700}
+    .request{background:#fff;color:#111}
+    #message{margin:12px 0;font-weight:700}
+  </style>
+</head>
+<body>
+  <h1>🎵 Request a Song</h1>
+  <p>Enter your name, search the list, and tap Request.</p>
+  <input id="name" placeholder="Your name" maxlength="50" />
+  <input id="search" placeholder="Search songs..." />
+  <div id="message"></div>
+  <div id="songs">Loading songs…</div>
+  <script>
+    const client = supabase.createClient("https://uzqaqzzzgjgjkhlgggvi.supabase.co", "sb_publishable_YpXBQjPwts2oAZEgvCuQOg_VZvhGSSV");
+    let songs = [];
+
+    async function loadSongs() {
+      const { data, error } = await client.from('songs')
+        .select('id,title,artist').eq('is_active', true)
+        .order('title', { ascending: true });
+      if (error) {
+        document.getElementById('songs').textContent = 'Could not load songs.';
+        return;
+      }
+      songs = data || [];
+      renderSongs(songs);
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    }
+
+    function renderSongs(list) {
+      const box = document.getElementById('songs');
+      if (!list.length) { box.innerHTML = '<p>No songs found.</p>'; return; }
+      box.innerHTML = list.map(s => `
+        <div class="song">
+          <div><strong>${escapeHtml(s.title)}</strong>${s.artist ? '<br><small>'+escapeHtml(s.artist)+'</small>' : ''}</div>
+          <button class="request" onclick="requestSong(${s.id}, ${JSON.stringify(s.title)})">Request</button>
+        </div>`).join('');
+    }
+
+    document.getElementById('search').addEventListener('input', e => {
+      const q = e.target.value.toLowerCase().trim();
+      renderSongs(songs.filter(s => s.title.toLowerCase().includes(q) || (s.artist||'').toLowerCase().includes(q)));
+    });
+
+    async function requestSong(songId, title) {
+      const requester = document.getElementById('name').value.trim();
+      const message = document.getElementById('message');
+      if (!requester) { message.textContent = 'Please enter your name first.'; return; }
+      const { error } = await client.from('requests').insert({ requester_name: requester, song_id: songId });
+      if (error) { message.textContent = 'Request could not be sent. Please try again.'; console.error(error); return; }
+      message.textContent = `✅ ${title} requested!`;
+      setTimeout(() => message.textContent = '', 4000);
+    }
+
+    loadSongs();
+  </script>
+</body>
+</html>
