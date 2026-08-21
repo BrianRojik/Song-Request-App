@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Request a Song</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body{font-family:Arial,sans-serif;max-width:760px;margin:0 auto;padding:24px;background:#111;color:#fff}
+    .hero{margin-bottom:24px}
+    .hero img{width:100%;max-height:320px;object-fit:cover;border-radius:16px;display:block;border:1px solid #333}
+    h1{font-size:2rem;margin:16px 0 8px}
+    p{color:#bbb}
+    input{width:100%;padding:14px;margin:8px 0 14px;border-radius:10px;border:1px solid #444;background:#1d1d1d;color:#fff;box-sizing:border-box}
+    .song{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #333}
+    button{padding:10px 16px;border:0;border-radius:10px;cursor:pointer;font-weight:700}
+    .request{background:#fff;color:#111}
+    #message{margin:12px 0;font-weight:700;min-height:24px}
+    #tipBox{display:none;margin:14px 0 20px;padding:16px;border:1px solid #333;border-radius:12px;background:#1a1a1a;text-align:center}
+    #tipBox p{margin:0 0 12px;color:#fff;font-weight:700}
+    .venmo-btn{display:inline-block;padding:12px 18px;border-radius:10px;background:#008CFF;color:#fff;text-decoration:none;font-weight:700}
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <img src="header-image.png" alt="Brian Rojik header image" />
+  </div>
+
+  <h1>🎵 Request a Song</h1>
+  <p>Enter your name, search the list, and tap Request.</p>
+
+  <input id="name" placeholder="Your name" maxlength="50" />
+  <input id="search" placeholder="Search songs..." />
+  <div id="message"></div>
+
+  <div id="tipBox">
+    <p>💵 Enjoying the music?</p>
+    <a class="venmo-btn" href="https://venmo.com/code?user_id=1910371816308736272&created=1787350555.8212528" target="_blank" rel="noopener noreferrer">Tip on Venmo</a>
+  </div>
+
+  <div id="songs">Loading songs…</div>
+
+  <script>
+    const client = supabase.createClient("https://uzqaqzzzgjgjkhlgggvi.supabase.co", "sb_publishable_YpXBQjPwts2oAZEgvCuQOg_VZvhGSSV");
+    let songs = [];
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, c => ({
+        '&':'&amp;',
+        '<':'&lt;',
+        '>':'&gt;',
+        '"':'&quot;',
+        "'":'&#039;'
+      }[c]));
+    }
+
+    async function loadSongs() {
+      const { data, error } = await client
+        .from('songs')
+        .select('id,title,artist')
+        .eq('is_active', true)
+        .order('title', { ascending: true });
+
+      if (error) {
+        console.error('Load songs error:', error);
+        document.getElementById('songs').textContent = 'Could not load songs.';
+        return;
+      }
+
+      songs = data || [];
+      renderSongs(songs);
+    }
+
+    function renderSongs(list) {
+      const box = document.getElementById('songs');
+
+      if (!list.length) {
+        box.innerHTML = '<p>No songs found.</p>';
+        return;
+      }
+
+      box.innerHTML = list.map(s => `
+        <div class="song">
+          <div>
+            <strong>${escapeHtml(s.title)}</strong>
+            ${s.artist ? '<br><small>' + escapeHtml(s.artist) + '</small>' : ''}
+          </div>
+          <button
+            class="request"
+            data-song-id="${s.id}"
+            data-song-title="${encodeURIComponent(s.title)}"
+          >Request</button>
+        </div>
+      `).join('');
+    }
+
+    document.getElementById('search').addEventListener('input', e => {
+      const q = e.target.value.toLowerCase().trim();
+      renderSongs(
+        songs.filter(s =>
+          s.title.toLowerCase().includes(q) ||
+          (s.artist || '').toLowerCase().includes(q)
+        )
+      );
+    });
+
+    document.getElementById('songs').addEventListener('click', async e => {
+      const button = e.target.closest('.request');
+      if (!button) return;
+
+      const songId = Number(button.dataset.songId);
+      const title = decodeURIComponent(button.dataset.songTitle);
+      await requestSong(songId, title, button);
+    });
+
+    async function requestSong(songId, title, button) {
+      const requester = document.getElementById('name').value.trim();
+      const message = document.getElementById('message');
+      const tipBox = document.getElementById('tipBox');
+
+      if (!requester) {
+        message.textContent = 'Please enter your name first.';
+        tipBox.style.display = 'none';
+        return;
+      }
+
+      button.disabled = true;
+      button.textContent = 'Sending...';
+
+      const { error } = await client
+        .from('requests')
+        .insert({
+          requester_name: requester,
+          song_id: songId
+        });
+
+      if (error) {
+        console.error('Request error:', error);
+        message.textContent = 'Request could not be sent. Please try again.';
+        tipBox.style.display = 'none';
+        button.disabled = false;
+        button.textContent = 'Request';
+        return;
+      }
+
+      message.textContent = `✅ ${title} requested!`;
+      tipBox.style.display = 'block';
+      button.textContent = 'Requested ✓';
+
+      setTimeout(() => {
+        message.textContent = '';
+        button.disabled = false;
+        button.textContent = 'Request';
+      }, 4000);
+    }
+
+    loadSongs();
+  </script>
+</body>
+</html>
