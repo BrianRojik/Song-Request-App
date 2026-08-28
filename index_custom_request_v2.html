@@ -1,0 +1,37 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Request a Song</title><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{font-family:Arial;max-width:760px;margin:auto;padding:24px;background:#111;color:#fff}
+img{width:100%;max-height:320px;object-fit:cover;border-radius:16px} input,textarea{width:100%;box-sizing:border-box;padding:14px;margin:8px 0 14px;border-radius:10px;border:1px solid #444;background:#1d1d1d;color:#fff}
+.song{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #333}
+button{padding:10px 16px;border:0;border-radius:10px;font-weight:700;cursor:pointer} .tip{display:none;margin:16px 0;padding:16px;text-align:center;background:#1a1a1a;border-radius:12px}
+.tip a{display:inline-block;background:#008cff;color:#fff;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:700}
+.custom{margin-top:28px;padding:18px;border:1px solid #333;border-radius:12px;background:#181818}
+</style></head><body>
+<img src="header-image.png" alt="Brian Rojik">
+<h1>🎵 Request a Song</h1><p>Enter your name, search the list, and tap Request.</p>
+<input id="name" maxlength="50" placeholder="Your name"><input id="search" placeholder="Search songs...">
+<div id="msg"></div><div class="tip" id="tip"><p>💵 Enjoying the music?</p><a href="https://venmo.com/code?user_id=1910371816308736272&created=1787350555.8212528" target="_blank">Tip on Venmo</a></div>
+<div id="songs">Loading songs…</div>
+<div class="custom"><h2>Can’t find your song?</h2><p>Send a custom request.</p>
+<textarea id="custom" maxlength="100" placeholder="Enter song title, artist, or another request..."></textarea>
+<button id="customBtn">Submit Custom Request</button><div id="customMsg"></div></div>
+<script>
+const client=supabase.createClient("https://uzqaqzzzgjgjkhlgggvi.supabase.co","sb_publishable_YpXBQjPwts2oAZEgvCuQOg_VZvhGSSV"); let songs=[];
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+async function load(){let{data,error}=await client.from('songs').select('id,title,artist').eq('is_active',true).order('title');
+if(error) return songsEl.textContent='Could not load songs.'; songs=data||[]; render(songs)}
+const songsEl=document.getElementById('songs');
+function render(list){songsEl.innerHTML=list.map(s=>`<div class="song"><div><b>${esc(s.title)}</b>${s.artist?'<br><small>'+esc(s.artist)+'</small>':''}</div><button class="req" data-id="${s.id}" data-title="${encodeURIComponent(s.title)}">Request</button></div>`).join('')||'<p>No songs found.</p>'}
+search.oninput=e=>{let q=e.target.value.toLowerCase();render(songs.filter(s=>s.title.toLowerCase().includes(q)||(s.artist||'').toLowerCase().includes(q)))};
+songsEl.onclick=async e=>{let b=e.target.closest('.req');if(!b)return;let n=name.value.trim();if(!n)return msg.textContent='Please enter your name first.';
+b.disabled=true;b.textContent='Sending...';let{error}=await client.from('requests').insert({requester_name:n,song_id:Number(b.dataset.id),custom_request:null});
+if(error){console.error(error);msg.textContent='Request could not be sent.';b.disabled=false;b.textContent='Request';return}
+msg.textContent='✅ '+decodeURIComponent(b.dataset.title)+' requested!';tip.style.display='block';b.textContent='Requested ✓';setTimeout(()=>{b.disabled=false;b.textContent='Request';msg.textContent=''},4000)};
+customBtn.onclick=async()=>{let n=name.value.trim(),c=custom.value.trim();if(!n)return customMsg.textContent='Please enter your name first.';if(!c)return customMsg.textContent='Please enter a custom request.';
+customBtn.disabled=true;customBtn.textContent='Sending...';let{error}=await client.from('requests').insert({requester_name:n,song_id:null,custom_request:c});
+if(error){console.error(error);customMsg.textContent='Custom request could not be sent.';customBtn.disabled=false;customBtn.textContent='Submit Custom Request';return}
+customMsg.textContent='✅ Custom request sent!';custom.value='';tip.style.display='block';customBtn.textContent='Sent ✓';setTimeout(()=>{customBtn.disabled=false;customBtn.textContent='Submit Custom Request';customMsg.textContent=''},4000)};
+load();
+</script></body></html>

@@ -1,0 +1,18 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Song Request Dashboard</title><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>body{font-family:Arial;max-width:900px;margin:auto;padding:24px;background:#111;color:#fff}input{width:100%;box-sizing:border-box;padding:12px;margin:7px 0;background:#1d1d1d;color:#fff;border:1px solid #444;border-radius:10px}button{padding:9px 14px;border:0;border-radius:9px;margin-right:6px}.card{padding:16px 0;border-bottom:1px solid #333}.muted{color:#aaa}.custom{color:#ffd166;font-weight:700}.hidden{display:none}</style></head><body>
+<h1>🎸 Song Request Dashboard</h1>
+<section id="login"><input id="email" placeholder="Email"><input id="password" type="password" placeholder="Password"><button onclick="signin()">Sign in</button><div id="loginMsg"></div></section>
+<section id="dash" class="hidden"><button onclick="signout()">Sign out</button><button onclick="loadReq()">Refresh</button><h2>Requests</h2><div id="requests"></div></section>
+<script>
+const client=supabase.createClient("https://uzqaqzzzgjgjkhlgggvi.supabase.co","sb_publishable_YpXBQjPwts2oAZEgvCuQOg_VZvhGSSV");
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
+async function signin(){let{error}=await client.auth.signInWithPassword({email:email.value.trim(),password:password.value});loginMsg.textContent=error?error.message:'';if(!error)show()}
+async function signout(){await client.auth.signOut();dash.classList.add('hidden');login.classList.remove('hidden')}
+async function show(){login.classList.add('hidden');dash.classList.remove('hidden');loadReq()}
+async function loadReq(){let{data,error}=await client.from('requests').select('id,requester_name,status,created_at,custom_request,songs(title,artist)').order('created_at',{ascending:false});
+if(error)return requests.textContent=error.message;requests.innerHTML=(data||[]).map(r=>`<div class="card"><div><b>${esc(r.requester_name)} — ${r.custom_request?'CUSTOM REQUEST':esc(r.songs?.title||'Unknown song')}</b></div>${r.custom_request?'<div class="custom">'+esc(r.custom_request)+'</div>':''}<div class="muted">${new Date(r.created_at).toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})} · ${r.status}</div><div><button onclick="statusSet(${r.id},'played')">Played</button><button onclick="statusSet(${r.id},'skipped')">Skip</button><button onclick="statusSet(${r.id},'new')">Reset</button></div></div>`).join('')||'<p>No requests yet.</p>'}
+async function statusSet(id,s){await client.from('requests').update({status:s}).eq('id',id);loadReq()}
+(async()=>{let{data}=await client.auth.getSession();if(data.session)show()})();
+</script></body></html>
